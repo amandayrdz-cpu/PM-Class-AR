@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useRef, useState } from "react";
+import { FocusEvent, FormEvent, useRef, useState } from "react";
 import { AlertCircle, Headphones, Loader2, MessageCircle, Send, Sparkles } from "lucide-react";
 import { ToolCard } from "@/components/tool-cards";
 import type { ToolResult } from "@/lib/tools";
@@ -40,6 +40,8 @@ export function ChatPanel() {
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isWidgetOpen, setIsWidgetOpen] = useState(false);
+  const widgetRef = useRef<HTMLElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   async function sendMessage(nextContent?: string) {
@@ -173,9 +175,32 @@ export function ChatPanel() {
     void sendMessage();
   }
 
+  function handleWidgetBlur(event: FocusEvent<HTMLElement>) {
+    if (!widgetRef.current?.contains(event.relatedTarget as Node | null)) {
+      setIsWidgetOpen(false);
+    }
+  }
+
   return (
-    <section className="group fixed bottom-5 right-5 z-50 flex items-end justify-end md:bottom-7 md:right-7" aria-label="SHEIN support chat">
-      <div className="absolute bottom-0 right-0 flex h-[86px] w-[270px] items-center gap-3 rounded-full border border-zinc-200 bg-white p-3 shadow-2xl shadow-black/25 transition duration-300 group-hover:pointer-events-none group-hover:translate-y-4 group-hover:scale-95 group-hover:opacity-0 group-focus-within:pointer-events-none group-focus-within:translate-y-4 group-focus-within:scale-95 group-focus-within:opacity-0">
+    <section
+      ref={widgetRef}
+      className="fixed bottom-5 right-5 z-50 md:bottom-7 md:right-7"
+      aria-label="SHEIN support chat"
+      onMouseEnter={() => setIsWidgetOpen(true)}
+      onMouseLeave={() => setIsWidgetOpen(false)}
+      onFocus={() => setIsWidgetOpen(true)}
+      onBlur={handleWidgetBlur}
+    >
+      <button
+        type="button"
+        className={cn(
+          "flex h-[86px] w-[270px] items-center gap-3 rounded-full border border-zinc-200 bg-white p-3 text-left shadow-2xl shadow-black/25 ring-4 ring-white/80 transition duration-300",
+          isWidgetOpen ? "translate-y-3 scale-95 opacity-0" : "translate-y-0 scale-100 opacity-100",
+        )}
+        aria-expanded={isWidgetOpen}
+        aria-controls="shein-support-chat"
+        onClick={() => setIsWidgetOpen((open) => !open)}
+      >
         <div className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-black text-white">
           <Headphones className="h-6 w-6" />
         </div>
@@ -185,9 +210,17 @@ export function ChatPanel() {
           <p className="text-xs text-zinc-500">Tracking, returns, exchanges</p>
         </div>
         <Sparkles className="ml-auto h-4 w-4 text-[#ff5f8f]" />
-      </div>
+      </button>
 
-      <div className="pointer-events-none flex h-[720px] max-h-[calc(100vh-2rem)] min-h-[600px] w-[min(calc(100vw-2rem),440px)] translate-y-6 scale-95 flex-col overflow-hidden rounded-[1.35rem] border border-zinc-200 bg-white opacity-0 shadow-2xl shadow-black/30 transition duration-300 group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:scale-100 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:translate-y-0 group-focus-within:scale-100 group-focus-within:opacity-100">
+      <div
+        id="shein-support-chat"
+        className={cn(
+          "absolute bottom-0 right-0 flex h-[720px] max-h-[calc(100vh-2rem)] min-h-[600px] w-[min(calc(100vw-2rem),440px)] flex-col overflow-hidden rounded-[1.35rem] border border-zinc-200 bg-white shadow-2xl shadow-black/30 transition duration-300",
+          isWidgetOpen
+            ? "pointer-events-auto translate-y-0 scale-100 opacity-100"
+            : "pointer-events-none translate-y-6 scale-95 opacity-0",
+        )}
+      >
         <header className="border-b border-zinc-200 bg-gradient-to-r from-black via-zinc-950 to-black p-5 text-white">
         <div className="flex items-center gap-3">
           <div className="grid h-11 w-11 place-items-center rounded-full bg-white text-black">
