@@ -189,10 +189,20 @@ function emitText(content: string | null | undefined, send: (event: string, data
 }
 
 function runTool(toolCall: ToolCall, send: (event: string, data: ClientToolEvent) => void): ConversationMessage {
+  if (toolCall.type !== "function") {
+    return {
+      role: "tool",
+      tool_call_id: toolCall.id,
+      content: "Unsupported tool call type.",
+    };
+  }
+
+  const toolName = toolCall.function.name;
+
   try {
     const input = JSON.parse(toolCall.function.arguments || "{}") as Record<string, string | undefined>;
-    const result = callTool(toolCall.function.name, input);
-    send("tool", { toolName: toolCall.function.name, ok: true, result });
+    const result = callTool(toolName, input);
+    send("tool", { toolName, ok: true, result });
 
     return {
       role: "tool",
@@ -205,7 +215,7 @@ function runTool(toolCall: ToolCall, send: (event: string, data: ClientToolEvent
         ? error.message
         : "The training tool could not complete that request.";
 
-    send("tool", { toolName: toolCall.function.name, ok: false, error: message });
+    send("tool", { toolName, ok: false, error: message });
 
     return {
       role: "tool",
