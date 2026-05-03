@@ -42,8 +42,8 @@ export function ChatPanel() {
   const [isLoading, setIsLoading] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  async function sendMessage(nextContent = input) {
-    const content = nextContent.trim();
+  async function sendMessage(nextContent?: string) {
+    const content = (nextContent ?? inputRef.current?.value ?? input).trim();
     if (!content || isLoading) return;
 
     const userMessage: ChatMessage = {
@@ -232,7 +232,7 @@ export function ChatPanel() {
           />
           <button
             type="submit"
-            disabled={isLoading || !input.trim()}
+            disabled={isLoading}
             className="grid h-12 w-12 place-items-center rounded-2xl bg-black text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-300"
             aria-label="Send message"
           >
