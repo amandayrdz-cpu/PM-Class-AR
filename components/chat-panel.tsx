@@ -174,7 +174,7 @@ export function ChatPanel() {
   }
 
   return (
-    <section className="flex h-[760px] max-h-[calc(100vh-3rem)] min-h-[620px] w-full max-w-[500px] flex-col overflow-hidden rounded-[1.5rem] border border-zinc-200 bg-white shadow-2xl shadow-black/15">
+    <section className="flex h-[720px] max-h-[calc(100vh-3rem)] min-h-[600px] w-full max-w-[440px] flex-col overflow-hidden rounded-[1.25rem] border border-zinc-200 bg-white shadow-2xl shadow-black/20">
       <header className="border-b border-zinc-200 bg-white p-5">
         <div className="flex items-center gap-3">
           <div className="grid h-11 w-11 place-items-center rounded-full bg-black text-white">
