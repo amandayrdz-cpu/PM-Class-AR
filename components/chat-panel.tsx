@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useRef, useState } from "react";
-import { AlertCircle, Loader2, MessageCircle, Send } from "lucide-react";
+import { AlertCircle, Headphones, Loader2, MessageCircle, Send, Sparkles } from "lucide-react";
 import { ToolCard } from "@/components/tool-cards";
 import type { ToolResult } from "@/lib/tools";
 import { cn } from "@/lib/utils";
@@ -174,15 +174,28 @@ export function ChatPanel() {
   }
 
   return (
-    <section className="flex h-[720px] max-h-[calc(100vh-3rem)] min-h-[600px] w-full max-w-[440px] flex-col overflow-hidden rounded-[1.25rem] border border-zinc-200 bg-white shadow-2xl shadow-black/20">
-      <header className="border-b border-zinc-200 bg-white p-5">
+    <section className="group fixed bottom-5 right-5 z-50 flex items-end justify-end md:bottom-7 md:right-7" aria-label="SHEIN support chat">
+      <div className="absolute bottom-0 right-0 flex h-[86px] w-[270px] items-center gap-3 rounded-full border border-zinc-200 bg-white p-3 shadow-2xl shadow-black/25 transition duration-300 group-hover:pointer-events-none group-hover:translate-y-4 group-hover:scale-95 group-hover:opacity-0 group-focus-within:pointer-events-none group-focus-within:translate-y-4 group-focus-within:scale-95 group-focus-within:opacity-0">
+        <div className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-black text-white">
+          <Headphones className="h-6 w-6" />
+        </div>
+        <div className="min-w-0">
+          <p className="text-[11px] font-black uppercase tracking-[0.24em] text-zinc-500">SHEIN support</p>
+          <p className="truncate text-sm font-bold text-black">Hover for order help</p>
+          <p className="text-xs text-zinc-500">Tracking, returns, exchanges</p>
+        </div>
+        <Sparkles className="ml-auto h-4 w-4 text-[#ff5f8f]" />
+      </div>
+
+      <div className="pointer-events-none flex h-[720px] max-h-[calc(100vh-2rem)] min-h-[600px] w-[min(calc(100vw-2rem),440px)] translate-y-6 scale-95 flex-col overflow-hidden rounded-[1.35rem] border border-zinc-200 bg-white opacity-0 shadow-2xl shadow-black/30 transition duration-300 group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:scale-100 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:translate-y-0 group-focus-within:scale-100 group-focus-within:opacity-100">
+        <header className="border-b border-zinc-200 bg-gradient-to-r from-black via-zinc-950 to-black p-5 text-white">
         <div className="flex items-center gap-3">
-          <div className="grid h-11 w-11 place-items-center rounded-full bg-black text-white">
+          <div className="grid h-11 w-11 place-items-center rounded-full bg-white text-black">
             <MessageCircle className="h-5 w-5" />
           </div>
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.28em] text-zinc-500">SHEIN</p>
-            <h1 className="text-xl font-semibold text-black">Order support</h1>
+            <p className="text-sm font-semibold uppercase tracking-[0.28em] text-zinc-300">SHEIN</p>
+            <h1 className="text-xl font-semibold text-white">Order support</h1>
           </div>
         </div>
       </header>
@@ -239,6 +252,7 @@ export function ChatPanel() {
             <Send className="h-4 w-4" />
           </button>
         </form>
+      </div>
       </div>
     </section>
   );

@@ -126,7 +126,7 @@ export default function Home() {
         </nav>
       </header>
 
-      <section className="mx-auto grid max-w-[1460px] gap-5 px-4 py-4 xl:grid-cols-[1fr_430px]">
+      <section className="mx-auto max-w-[1460px] px-4 py-4">
         <div className="space-y-5">
           <section className="grid gap-3 lg:grid-cols-[250px_1fr_250px]">
             <div className="grid gap-3">
@@ -244,11 +244,11 @@ export default function Home() {
             </div>
           </section>
         </div>
-
-        <aside id="support" className="xl:sticky xl:top-28">
-          <ChatPanel />
-        </aside>
       </section>
+
+      <div id="support">
+        <ChatPanel />
+      </div>
     </main>
   );
 }
