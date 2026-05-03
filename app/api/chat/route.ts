@@ -1,5 +1,4 @@
-import Anthropic from "@anthropic-ai/sdk";
-import type { ContentBlock, MessageParam, Tool, ToolUseBlock } from "@anthropic-ai/sdk/resources/messages";
+import OpenAI from "openai";
 import { NextResponse } from "next/server";
 import { systemPrompt } from "@/lib/system-prompt";
 import {
@@ -14,7 +13,6 @@ import {
 type ChatMessage = {
   role: "user" | "assistant";
   content: string;
-  hiddenContext?: string;
 };
 
 type ClientToolEvent = {
@@ -24,56 +22,78 @@ type ClientToolEvent = {
   error?: string;
 };
 
-const tools: Tool[] = [
+type ConversationMessage = OpenAI.Chat.Completions.ChatCompletionMessageParam;
+type ToolCall = OpenAI.Chat.Completions.ChatCompletionMessageToolCall;
+
+const model = process.env.OPENAI_MODEL ?? "gpt-4o-mini";
+
+const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   {
-    name: "lookupOrder",
-    description: "Verify a customer's order number and email, then return order and shipment details.",
-    input_schema: {
-      type: "object",
-      properties: {
-        orderNumber: { type: "string", description: "Northwind order number, for example NW-1001." },
-        email: { type: "string", description: "Customer email address on the order." },
+    type: "function",
+    function: {
+      name: "lookupOrder",
+      description: "Verify a SHEIN customer's order ID and email, then return order and shipment details.",
+      parameters: {
+        type: "object",
+        properties: {
+          orderId: { type: "string", description: "SHEIN demo order ID, for example ORD-1001." },
+          email: { type: "string", description: "Customer email address on the order." },
+        },
+        required: ["orderId", "email"],
+        additionalProperties: false,
       },
-      required: ["orderNumber", "email"],
     },
   },
   {
-    name: "startReturn",
-    description: "Start a return for an eligible item after the customer confirms the action.",
-    input_schema: {
-      type: "object",
-      properties: {
-        orderNumber: { type: "string" },
-        sku: { type: "string" },
-        reason: { type: "string" },
+    type: "function",
+    function: {
+      name: "startReturn",
+      description: "Start a return for an eligible delivered item after the customer confirms the action.",
+      parameters: {
+        type: "object",
+        properties: {
+          orderId: { type: "string" },
+          product: { type: "string" },
+          reason: { type: "string" },
+        },
+        required: ["orderId", "product", "reason"],
+        additionalProperties: false,
       },
-      required: ["orderNumber", "sku", "reason"],
     },
   },
   {
-    name: "startExchange",
-    description: "Reserve a different size for an eligible item after the customer confirms the action.",
-    input_schema: {
-      type: "object",
-      properties: {
-        orderNumber: { type: "string" },
-        sku: { type: "string" },
-        newSize: { type: "string" },
+    type: "function",
+    function: {
+      name: "startExchange",
+      description: "Start a size or color exchange for an eligible item after the customer confirms the action.",
+      parameters: {
+        type: "object",
+        properties: {
+          orderId: { type: "string" },
+          product: { type: "string" },
+          newSize: { type: "string" },
+          newColor: { type: "string" },
+        },
+        required: ["orderId", "product"],
+        additionalProperties: false,
       },
-      required: ["orderNumber", "sku", "newSize"],
     },
   },
   {
-    name: "approveReplacement",
-    description: "Approve a replacement for a damaged or wrong eligible item after the customer confirms.",
-    input_schema: {
-      type: "object",
-      properties: {
-        orderNumber: { type: "string" },
-        sku: { type: "string" },
-        reason: { type: "string" },
+    type: "function",
+    function: {
+      name: "approveReplacement",
+      description: "Approve a replacement for a damaged or wrong delivered item after the customer confirms.",
+      parameters: {
+        type: "object",
+        properties: {
+          orderId: { type: "string" },
+          product: { type: "string" },
+          reason: { type: "string" },
+        },
+        required: ["orderId", "product", "reason"],
+        additionalProperties: false,
       },
-      required: ["orderNumber", "sku", "reason"],
     },
   },
 ];
@@ -83,12 +103,15 @@ const encoder = new TextEncoder();
 export async function POST(request: Request) {
   const { messages } = (await request.json()) as { messages?: ChatMessage[] };
 
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return NextResponse.json({ error: "Missing ANTHROPIC_API_KEY." }, { status: 500 });
+  if (!process.env.OPENAI_API_KEY) {
+    return NextResponse.json({ error: "Missing OPENAI_API_KEY." }, { status: 500 });
   }
 
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-  const conversation = toAnthropicMessages(messages ?? []);
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const conversation: ConversationMessage[] = [
+    { role: "system", content: systemPrompt },
+    ...toOpenAIMessages(messages ?? []),
+  ];
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -97,40 +120,43 @@ export async function POST(request: Request) {
       };
 
       try {
-        let response = await anthropic.messages.create({
-          model: "claude-sonnet-4-5-20250929",
-          max_tokens: 900,
-          system: systemPrompt,
-          tools,
+        let response = await openai.chat.completions.create({
+          model,
           messages: conversation,
+          tools,
+          tool_choice: "auto",
         });
 
-        emitText(response.content, send);
+        emitText(response.choices[0]?.message.content, send);
 
         let safetyCounter = 0;
-        while (response.stop_reason === "tool_use" && safetyCounter < 6) {
+        while (response.choices[0]?.finish_reason === "tool_calls" && safetyCounter < 6) {
           safetyCounter += 1;
-          const toolUses = response.content.filter((block): block is ToolUseBlock => block.type === "tool_use");
+          const assistantMessage = response.choices[0]?.message;
+          if (!assistantMessage) break;
 
-          conversation.push({ role: "assistant", content: response.content });
-          const toolResults = toolUses.map((toolUse) => runTool(toolUse, send));
-          conversation.push({ role: "user", content: toolResults });
+          const toolCalls = assistantMessage.tool_calls ?? [];
 
-          response = await anthropic.messages.create({
-            model: "claude-sonnet-4-5-20250929",
-            max_tokens: 900,
-            system: systemPrompt,
-            tools,
+          conversation.push(assistantMessage);
+          for (const toolCall of toolCalls) {
+            const toolResult = runTool(toolCall, send);
+            conversation.push(toolResult);
+          }
+
+          response = await openai.chat.completions.create({
+            model,
             messages: conversation,
+            tools,
+            tool_choice: "auto",
           });
 
-          emitText(response.content, send);
+          emitText(response.choices[0]?.message.content, send);
         }
 
         send("done", {});
       } catch (error) {
         send("error", {
-          message: error instanceof Error ? error.message : "Something went wrong while talking to Claude.",
+          message: error instanceof Error ? error.message : "Something went wrong while talking to OpenAI.",
         });
       } finally {
         controller.close();
@@ -147,35 +173,30 @@ export async function POST(request: Request) {
   });
 }
 
-function toAnthropicMessages(messages: ChatMessage[]): MessageParam[] {
+function toOpenAIMessages(messages: ChatMessage[]): ConversationMessage[] {
   return messages
-    .filter((message) => message.content.trim() || message.hiddenContext?.trim())
+    .filter((message) => message.content.trim())
     .map((message) => ({
       role: message.role,
-      content: [message.content, message.hiddenContext].filter(Boolean).join("\n\n"),
+      content: message.content,
     }));
 }
 
-function emitText(content: ContentBlock[], send: (event: string, data: unknown) => void) {
-  const text = content
-    .filter((block) => block.type === "text")
-    .map((block) => block.text)
-    .join("");
-
-  if (text.trim()) {
-    send("text", { text });
+function emitText(content: string | null | undefined, send: (event: string, data: unknown) => void) {
+  if (content?.trim()) {
+    send("text", { text: content });
   }
 }
 
-function runTool(toolUse: ToolUseBlock, send: (event: string, data: ClientToolEvent) => void) {
+function runTool(toolCall: ToolCall, send: (event: string, data: ClientToolEvent) => void): ConversationMessage {
   try {
-    const input = toolUse.input as Record<string, string>;
-    const result = callTool(toolUse.name, input);
-    send("tool", { toolName: toolUse.name, ok: true, result });
+    const input = JSON.parse(toolCall.function.arguments || "{}") as Record<string, string | undefined>;
+    const result = callTool(toolCall.function.name, input);
+    send("tool", { toolName: toolCall.function.name, ok: true, result });
 
     return {
-      type: "tool_result" as const,
-      tool_use_id: toolUse.id,
+      role: "tool",
+      tool_call_id: toolCall.id,
       content: JSON.stringify(result),
     };
   } catch (error) {
@@ -184,28 +205,35 @@ function runTool(toolUse: ToolUseBlock, send: (event: string, data: ClientToolEv
         ? error.message
         : "The training tool could not complete that request.";
 
-    send("tool", { toolName: toolUse.name, ok: false, error: message });
+    send("tool", { toolName: toolCall.function.name, ok: false, error: message });
 
     return {
-      type: "tool_result" as const,
-      tool_use_id: toolUse.id,
-      is_error: true,
+      role: "tool",
+      tool_call_id: toolCall.id,
       content: message,
     };
   }
 }
 
-function callTool(name: string, input: Record<string, string>): ToolResult {
+function callTool(name: string, input: Record<string, string | undefined>): ToolResult {
   switch (name) {
     case "lookupOrder":
-      return lookupOrder(input.orderNumber, input.email);
+      return lookupOrder(required(input.orderId, "orderId"), required(input.email, "email"));
     case "startReturn":
-      return startReturn(input.orderNumber, input.sku, input.reason);
+      return startReturn(required(input.orderId, "orderId"), required(input.product, "product"), required(input.reason, "reason"));
     case "startExchange":
-      return startExchange(input.orderNumber, input.sku, input.newSize);
+      return startExchange(required(input.orderId, "orderId"), required(input.product, "product"), input.newSize, input.newColor);
     case "approveReplacement":
-      return approveReplacement(input.orderNumber, input.sku, input.reason);
+      return approveReplacement(required(input.orderId, "orderId"), required(input.product, "product"), required(input.reason, "reason"));
     default:
       throw new Error(`Unknown tool: ${name}`);
   }
+}
+
+function required(value: string | undefined, field: string) {
+  if (!value?.trim()) {
+    throw new Error(`Missing required field: ${field}`);
+  }
+
+  return value;
 }

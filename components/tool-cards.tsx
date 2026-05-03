@@ -24,60 +24,59 @@ export function ToolCard({ result }: ToolCardProps) {
 }
 
 function TrackingCard({ result }: { result: Extract<ToolResult, { type: "order" }> }) {
-  const { order } = result;
+  const { order, relatedTickets } = result;
 
   return (
-    <article className="rounded-2xl border bg-white p-4 shadow-sm">
-      <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900">
-        <Truck className="h-4 w-4 text-blue-600" />
-        Tracking for {order.orderNumber}
+    <article className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+      <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-zinc-950">
+        <Truck className="h-4 w-4" />
+        Tracking for {order.order_id}
       </div>
       <div className="space-y-2 text-sm">
-        <Row label="Status" value={statusLabel(order.status)} />
-        <Row label="Carrier" value={order.shipment.carrier} />
-        <Row label="Tracking" value={order.shipment.trackingNumber} />
-        {order.shipment.estimatedDelivery ? (
-          <Row label="Estimated delivery" value={formatDate(order.shipment.estimatedDelivery)} />
-        ) : null}
-        {order.shipment.deliveredAt ? <Row label="Delivered" value={formatDate(order.shipment.deliveredAt)} /> : null}
-        <p className="rounded-xl bg-slate-50 p-3 text-slate-700">{order.shipment.lastEvent}</p>
+        <Row label="Customer" value={order.customer_name} />
+        <Row label="Status" value={order.shipping_status} />
+        <Row label="Carrier" value={order.carrier ?? "Pending"} />
+        <Row label="Tracking" value={order.tracking_number ?? "Not assigned yet"} />
+        <Row label="Estimated delivery" value={formatDate(order.delivery_estimate)} />
+        <Row label="Payment" value={order.payment_status} />
       </div>
       <div className="mt-3 space-y-2">
         {order.items.map((item) => (
-          <div key={item.sku} className="flex items-center gap-3 rounded-xl bg-slate-50 p-2">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={item.image} alt="" className="h-10 w-10 rounded-lg object-cover" />
-            <div className="min-w-0 flex-1 text-sm">
-              <p className="truncate font-medium text-slate-900">{item.name}</p>
-              <p className="text-slate-500">
-                {item.sku} - Size {item.size}
-              </p>
-            </div>
+          <div key={`${item.product}-${item.size}-${item.color}`} className="rounded-xl bg-zinc-50 p-3 text-sm">
+            <p className="font-medium text-zinc-950">{item.product}</p>
+            <p className="text-zinc-500">
+              {item.color} / Size {item.size} / Qty {item.qty}
+            </p>
           </div>
         ))}
       </div>
+      {relatedTickets.length ? (
+        <div className="mt-3 rounded-xl bg-amber-50 p-3 text-xs text-amber-900">
+          Existing ticket: {relatedTickets[0].ticket_id} ({relatedTickets[0].issue_type}, {relatedTickets[0].status})
+        </div>
+      ) : null}
     </article>
   );
 }
 
 function ReturnCard({ result }: { result: Extract<ToolResult, { type: "return" }> }) {
   return (
-    <article className="rounded-2xl border bg-white p-4 shadow-sm">
-      <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900">
-        <PackageCheck className="h-4 w-4 text-emerald-600" />
+    <article className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+      <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-zinc-950">
+        <PackageCheck className="h-4 w-4" />
         Return started
       </div>
-      <p className="text-sm text-slate-700">{result.message}</p>
-      <div className="my-3 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-950">
-        <p className="font-medium">{result.item.name}</p>
-        <p>Refund: ${result.item.price.toFixed(2)}</p>
+      <p className="text-sm text-zinc-700">{result.message}</p>
+      <div className="my-3 rounded-xl bg-zinc-950 p-3 text-sm text-white">
+        <p className="font-medium">{result.item.product}</p>
+        <p>Refund estimate: ${result.refundAmount.toFixed(2)}</p>
         <p>{result.refundEstimate}</p>
       </div>
       <a
         href={result.labelUrl}
         target="_blank"
         rel="noreferrer"
-        className="inline-flex items-center gap-2 rounded-full bg-slate-950 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
+        className="inline-flex items-center gap-2 rounded-full bg-zinc-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800"
       >
         <Download className="h-4 w-4" />
         Download fake label
@@ -88,20 +87,25 @@ function ReturnCard({ result }: { result: Extract<ToolResult, { type: "return" }
 
 function ExchangeCard({ result }: { result: Extract<ToolResult, { type: "exchange" }> }) {
   return (
-    <article className="rounded-2xl border bg-white p-4 shadow-sm">
-      <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900">
-        <RefreshCcw className="h-4 w-4 text-violet-600" />
-        Size exchange confirmed
+    <article className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+      <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-zinc-950">
+        <RefreshCcw className="h-4 w-4" />
+        Exchange confirmed
       </div>
-      <p className="text-sm text-slate-700">{result.message}</p>
+      <p className="text-sm text-zinc-700">{result.message}</p>
       <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-        <div className="rounded-xl bg-slate-50 p-3">
-          <p className="text-slate-500">Original size</p>
-          <p className="font-semibold">{result.oldSize}</p>
+        <div className="rounded-xl bg-zinc-50 p-3">
+          <p className="text-zinc-500">Original</p>
+          <p className="font-semibold">
+            {result.oldColor} / {result.oldSize}
+          </p>
         </div>
-        <div className="rounded-xl bg-violet-50 p-3">
-          <p className="text-violet-700">New size</p>
-          <p className="font-semibold text-violet-950">{result.newSize}</p>
+        <div className="rounded-xl bg-pink-50 p-3">
+          <p className="text-pink-700">New</p>
+          <p className="font-semibold text-pink-950">
+            {result.newSize}
+            {result.newColor ? ` / ${result.newColor}` : ""}
+          </p>
         </div>
       </div>
     </article>
@@ -110,12 +114,12 @@ function ExchangeCard({ result }: { result: Extract<ToolResult, { type: "exchang
 
 function ReplacementCard({ result }: { result: Extract<ToolResult, { type: "replacement" }> }) {
   return (
-    <article className="rounded-2xl border bg-white p-4 shadow-sm">
-      <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900">
-        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+    <article className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
+      <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-zinc-950">
+        <CheckCircle2 className="h-4 w-4" />
         Replacement approved
       </div>
-      <p className="text-sm text-slate-700">{result.message}</p>
+      <p className="text-sm text-zinc-700">{result.message}</p>
       <div className="mt-3 rounded-xl bg-emerald-50 p-3 text-sm">
         <p className="text-emerald-700">Confirmation</p>
         <p className="font-semibold text-emerald-950">{result.confirmationNumber}</p>
@@ -127,17 +131,10 @@ function ReplacementCard({ result }: { result: Extract<ToolResult, { type: "repl
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <span className="text-slate-500">{label}</span>
-      <span className="text-right font-medium text-slate-900">{value}</span>
+      <span className="text-zinc-500">{label}</span>
+      <span className="text-right font-medium text-zinc-950">{value}</span>
     </div>
   );
-}
-
-function statusLabel(status: string) {
-  return status
-    .split("_")
-    .map((part) => part[0].toUpperCase() + part.slice(1))
-    .join(" ");
 }
 
 function formatDate(value: string) {

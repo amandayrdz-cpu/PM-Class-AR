@@ -1,224 +1,151 @@
-export type OrderStatus =
-  | "processing"
-  | "in_transit"
-  | "delivered"
-  | "lost"
-  | "delivered_damaged"
-  | "outside_return_window"
-  | "final_sale";
-
 export type OrderItem = {
-  sku: string;
-  name: string;
+  product: string;
   size: string;
-  price: number;
-  image: string;
-  finalSale?: boolean;
-};
-
-export type Shipment = {
-  carrier: string;
-  trackingNumber: string;
-  estimatedDelivery?: string;
-  deliveredAt?: string;
-  lastEvent: string;
+  color: string;
+  qty: number;
 };
 
 export type Order = {
-  orderNumber: string;
+  order_id: string;
+  customer_name: string;
   email: string;
-  placedAt: string;
-  status: OrderStatus;
-  returnBy?: string;
   items: OrderItem[];
-  shipment: Shipment;
+  order_date: string;
+  shipping_status: "In Transit" | "Delivered" | "Pending";
+  tracking_number: string | null;
+  carrier: string | null;
+  delivery_estimate: string;
+  payment_status: "Paid";
+  total: number;
 };
 
-const imageFor = (label: string, bg: string) =>
-  `https://placehold.co/160x160/${bg}/ffffff?text=${encodeURIComponent(label)}`;
+export type SupportTicket = {
+  ticket_id: string;
+  order_id: string;
+  issue_type: "Tracking" | "Return" | "Cancellation" | "Damaged Item";
+  message: string;
+  status: "Open";
+  priority: "High" | "Medium";
+};
+
+export type Product = {
+  name: string;
+  sizes: string[];
+  price: number;
+};
 
 export const orders: Order[] = [
   {
-    orderNumber: "NW-1001",
-    email: "mia@example.com",
-    placedAt: "2026-04-20",
-    status: "in_transit",
-    returnBy: "2026-06-04",
+    order_id: "ORD-1001",
+    customer_name: "Jessica Taylor",
+    email: "jessica.taylor@email.com",
     items: [
-      { sku: "TEE-BLK-M", name: "Black Tee", size: "M", price: 35, image: imageFor("Black Tee", "111827") },
+      { product: "Classic White T-Shirt", size: "M", color: "White", qty: 1 },
+      { product: "High Waisted Jeans", size: "8", color: "Blue", qty: 1 },
     ],
-    shipment: {
-      carrier: "UPS",
-      trackingNumber: "1Z999NW1001",
-      estimatedDelivery: "2026-05-05",
-      lastEvent: "Out for delivery - Miami, FL",
-    },
+    order_date: "2026-04-20",
+    shipping_status: "In Transit",
+    tracking_number: "TRK123456US",
+    carrier: "UPS",
+    delivery_estimate: "2026-04-25",
+    payment_status: "Paid",
+    total: 89.98,
   },
   {
-    orderNumber: "NW-1002",
-    email: "alex@example.com",
-    placedAt: "2026-04-12",
-    status: "delivered",
-    returnBy: "2026-05-27",
-    items: [
-      { sku: "HOOD-GRY-L", name: "Cloud Fleece Hoodie", size: "L", price: 88, image: imageFor("Hoodie", "6b7280") },
-      { sku: "CAP-NVY-OS", name: "Northwind Cap", size: "OS", price: 28, image: imageFor("Cap", "1e3a8a") },
-    ],
-    shipment: {
-      carrier: "USPS",
-      trackingNumber: "9400NW1002",
-      deliveredAt: "2026-04-17",
-      lastEvent: "Delivered - Austin, TX",
-    },
+    order_id: "ORD-1002",
+    customer_name: "Marcus Green",
+    email: "marcus.green@email.com",
+    items: [{ product: "Oversized Hoodie", size: "L", color: "Black", qty: 1 }],
+    order_date: "2026-04-18",
+    shipping_status: "Delivered",
+    tracking_number: "TRK654321US",
+    carrier: "FedEx",
+    delivery_estimate: "2026-04-22",
+    payment_status: "Paid",
+    total: 49.99,
   },
   {
-    orderNumber: "NW-1003",
-    email: "sam@example.com",
-    placedAt: "2026-04-25",
-    status: "delivered",
-    returnBy: "2026-06-09",
-    items: [
-      { sku: "JEAN-IND-32", name: "Everyday Denim", size: "32", price: 96, image: imageFor("Denim", "312e81") },
-    ],
-    shipment: {
-      carrier: "FedEx",
-      trackingNumber: "6129NW1003",
-      deliveredAt: "2026-05-01",
-      lastEvent: "Delivered - Portland, OR",
-    },
-  },
-  {
-    orderNumber: "NW-1004",
-    email: "taylor@example.com",
-    placedAt: "2026-03-10",
-    status: "outside_return_window",
-    returnBy: "2026-04-24",
-    items: [
-      { sku: "JKT-OLV-S", name: "Trail Jacket", size: "S", price: 140, image: imageFor("Jacket", "365314") },
-    ],
-    shipment: {
-      carrier: "UPS",
-      trackingNumber: "1Z999NW1004",
-      deliveredAt: "2026-03-15",
-      lastEvent: "Delivered - Denver, CO",
-    },
-  },
-  {
-    orderNumber: "NW-1005",
-    email: "jordan@example.com",
-    placedAt: "2026-04-03",
-    status: "final_sale",
-    returnBy: "2026-05-18",
-    items: [
-      {
-        sku: "DRESS-RED-M",
-        name: "Archive Wrap Dress",
-        size: "M",
-        price: 64,
-        image: imageFor("Dress", "b91c1c"),
-        finalSale: true,
-      },
-    ],
-    shipment: {
-      carrier: "USPS",
-      trackingNumber: "9400NW1005",
-      deliveredAt: "2026-04-08",
-      lastEvent: "Delivered - Chicago, IL",
-    },
-  },
-  {
-    orderNumber: "NW-1006",
-    email: "casey@example.com",
-    placedAt: "2026-04-18",
-    status: "delivered_damaged",
-    returnBy: "2026-06-02",
-    items: [
-      { sku: "SHOE-WHT-9", name: "Court Sneaker", size: "9", price: 110, image: imageFor("Sneaker", "f8fafc") },
-    ],
-    shipment: {
-      carrier: "FedEx",
-      trackingNumber: "6129NW1006",
-      deliveredAt: "2026-04-23",
-      lastEvent: "Delivered with exception note - Brooklyn, NY",
-    },
-  },
-  {
-    orderNumber: "NW-1007",
-    email: "riley@example.com",
-    placedAt: "2026-04-01",
-    status: "lost",
-    returnBy: "2026-05-16",
-    items: [
-      { sku: "BAG-TAN-OS", name: "Canvas Weekender", size: "OS", price: 124, image: imageFor("Bag", "92400e") },
-    ],
-    shipment: {
-      carrier: "UPS",
-      trackingNumber: "1Z999NW1007",
-      estimatedDelivery: "2026-04-08",
-      lastEvent: "In transit delay - no scan since Apr 6",
-    },
-  },
-  {
-    orderNumber: "NW-1008",
-    email: "quinn@example.com",
-    placedAt: "2026-04-27",
-    status: "processing",
-    returnBy: "2026-06-11",
-    items: [
-      { sku: "POLO-BLU-XL", name: "Pique Polo", size: "XL", price: 52, image: imageFor("Polo", "1d4ed8") },
-    ],
-    shipment: {
-      carrier: "UPS",
-      trackingNumber: "Pending",
-      estimatedDelivery: "2026-05-07",
-      lastEvent: "Label created - waiting for carrier pickup",
-    },
-  },
-  {
-    orderNumber: "NW-1009",
-    email: "avery@example.com",
-    placedAt: "2026-04-14",
-    status: "delivered",
-    returnBy: "2026-05-29",
-    items: [
-      { sku: "SKIRT-BLK-S", name: "A-Line Skirt", size: "S", price: 72, image: imageFor("Skirt", "18181b") },
-      { sku: "TEE-WHT-S", name: "White Tee", size: "S", price: 35, image: imageFor("White Tee", "e5e7eb") },
-    ],
-    shipment: {
-      carrier: "USPS",
-      trackingNumber: "9400NW1009",
-      deliveredAt: "2026-04-19",
-      lastEvent: "Delivered - Seattle, WA",
-    },
-  },
-  {
-    orderNumber: "NW-1010",
-    email: "morgan@example.com",
-    placedAt: "2026-04-22",
-    status: "delivered_damaged",
-    returnBy: "2026-06-06",
-    items: [
-      {
-        sku: "SWEAT-GRN-M",
-        name: "Final Sale Crewneck",
-        size: "M",
-        price: 48,
-        image: imageFor("Crewneck", "166534"),
-        finalSale: true,
-      },
-    ],
-    shipment: {
-      carrier: "FedEx",
-      trackingNumber: "6129NW1010",
-      deliveredAt: "2026-04-29",
-      lastEvent: "Delivered - Atlanta, GA",
-    },
+    order_id: "ORD-1003",
+    customer_name: "Alicia Brown",
+    email: "alicia.brown@email.com",
+    items: [{ product: "Summer Dress", size: "S", color: "Yellow", qty: 1 }],
+    order_date: "2026-04-19",
+    shipping_status: "Pending",
+    tracking_number: null,
+    carrier: null,
+    delivery_estimate: "2026-04-27",
+    payment_status: "Paid",
+    total: 59.99,
   },
 ];
 
-export const findOrder = (orderNumber: string, email: string) =>
-  orders.find(
-    (order) =>
-      order.orderNumber.toLowerCase() === orderNumber.trim().toLowerCase() &&
-      order.email.toLowerCase() === email.trim().toLowerCase(),
-  );
+export const supportTickets: SupportTicket[] = [
+  {
+    ticket_id: "TCK-2001",
+    order_id: "ORD-1001",
+    issue_type: "Tracking",
+    message: "Where is my order? It hasn't moved in 3 days.",
+    status: "Open",
+    priority: "High",
+  },
+  {
+    ticket_id: "TCK-2002",
+    order_id: "ORD-1002",
+    issue_type: "Return",
+    message: "I want to return the hoodie. It's too big.",
+    status: "Open",
+    priority: "Medium",
+  },
+  {
+    ticket_id: "TCK-2003",
+    order_id: "ORD-1003",
+    issue_type: "Cancellation",
+    message: "Can I cancel this order before it ships?",
+    status: "Open",
+    priority: "High",
+  },
+  {
+    ticket_id: "TCK-2004",
+    order_id: "ORD-1002",
+    issue_type: "Damaged Item",
+    message: "The hoodie arrived with a tear on the sleeve.",
+    status: "Open",
+    priority: "High",
+  },
+];
+
+export const policies = {
+  return_policy: {
+    window_days: 30,
+    conditions: "Items must be unworn, unwashed, and with tags attached.",
+    refund_method: "Original payment method",
+    processing_time_days: 5,
+  },
+  exchange_policy: {
+    allowed: true,
+    notes: "Exchanges allowed for size or color only",
+  },
+  shipping_policy: {
+    standard_delivery_days: "5-7 business days",
+    expedited_delivery_days: "2-3 business days",
+  },
+};
+
+export const products: Product[] = [
+  { name: "Classic White T-Shirt", sizes: ["S", "M", "L", "XL"], price: 19.99 },
+  { name: "High Waisted Jeans", sizes: ["6", "8", "10", "12"], price: 69.99 },
+  { name: "Oversized Hoodie", sizes: ["S", "M", "L"], price: 49.99 },
+  { name: "Summer Dress", sizes: ["XS", "S", "M"], price: 59.99 },
+];
+
+export const testPrompts = [
+  "Where is my order ORD-1001?",
+  "I want to return my jeans from order ORD-1001",
+  "My hoodie arrived damaged",
+  "Can I cancel ORD-1003?",
+  "I got the wrong size, I need a medium instead",
+];
+
+export function findOrderById(orderId: string) {
+  return orders.find((order) => order.order_id.toLowerCase() === orderId.trim().toLowerCase());
+}

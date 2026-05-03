@@ -1,34 +1,38 @@
-import { orders, type Order, type OrderItem } from "./mock-data";
+import { orders, policies, products, supportTickets, type Order, type OrderItem, type Product } from "./mock-data";
 
 export type ToolResult =
-  | { type: "order"; order: Order }
+  | { type: "order"; order: Order; relatedTickets: typeof supportTickets }
   | {
       type: "return";
-      orderNumber: string;
+      orderId: string;
       item: OrderItem;
       reason: string;
+      refundAmount: number;
       labelUrl: string;
       refundEstimate: string;
       message: string;
     }
   | {
       type: "exchange";
-      orderNumber: string;
+      orderId: string;
       item: OrderItem;
+      product: Product;
       oldSize: string;
       newSize: string;
+      oldColor: string;
+      newColor?: string;
       message: string;
     }
   | {
       type: "replacement";
-      orderNumber: string;
+      orderId: string;
       item: OrderItem;
       reason: string;
       confirmationNumber: string;
       message: string;
     };
 
-const SUPPORT_EMAIL = "support@northwind.example";
+export const SUPPORT_EMAIL = "support@shein-training.example";
 
 export class ToolError extends Error {
   constructor(
@@ -37,144 +41,170 @@ export class ToolError extends Error {
       | "ORDER_NOT_FOUND"
       | "ITEM_NOT_FOUND"
       | "RETURN_WINDOW_EXPIRED"
-      | "FINAL_SALE"
       | "NOT_DELIVERED"
+      | "SIZE_UNAVAILABLE"
+      | "EXCHANGE_TARGET_REQUIRED"
       | "REPLACEMENT_NOT_ALLOWED",
   ) {
     super(message);
   }
 }
 
-export function lookupOrder(orderNumber: string, email: string): ToolResult {
-  const normalizedOrder = orderNumber.trim().toUpperCase();
+export function lookupOrder(orderId: string, email: string): ToolResult {
+  const normalizedOrder = orderId.trim().toUpperCase();
   const normalizedEmail = email.trim().toLowerCase();
   const order = orders.find(
-    (candidate) =>
-      candidate.orderNumber.toUpperCase() === normalizedOrder &&
-      candidate.email.toLowerCase() === normalizedEmail,
+    (candidate) => candidate.order_id.toUpperCase() === normalizedOrder && candidate.email.toLowerCase() === normalizedEmail,
   );
 
   if (!order) {
     throw new ToolError(
-      `We could not find that order and email combination. Please double-check both values or email ${SUPPORT_EMAIL}.`,
+      `We could not find that SHEIN order and email combination. Please double-check both values or email ${SUPPORT_EMAIL}.`,
       "ORDER_NOT_FOUND",
     );
   }
 
-  return { type: "order", order };
+  return {
+    type: "order",
+    order,
+    relatedTickets: supportTickets.filter((ticket) => ticket.order_id === order.order_id),
+  };
 }
 
-export function startReturn(orderNumber: string, sku: string, reason: string): ToolResult {
-  const order = findOrder(orderNumber);
-  const item = findItem(order, sku);
+export function startReturn(orderId: string, productName: string, reason: string): ToolResult {
+  const order = findOrder(orderId);
+  const item = findItem(order, productName);
 
-  if (item.finalSale || order.status === "final_sale") {
-    throw new ToolError(
-      `${item.name} is marked final sale, so it is not eligible for return. If you think this is a mistake, email ${SUPPORT_EMAIL}.`,
-      "FINAL_SALE",
-    );
+  if (order.shipping_status !== "Delivered") {
+    throw new ToolError("Returns can only be started after an order has been delivered.", "NOT_DELIVERED");
   }
 
-  if (order.status === "outside_return_window") {
+  if (isOutsideReturnWindow(order.order_date)) {
     throw new ToolError(
-      `This order is outside Northwind's 30-day return window, so we cannot start a self-service return. Email ${SUPPORT_EMAIL} if you need help.`,
+      `This order is outside SHEIN's ${policies.return_policy.window_days}-day return window, so we cannot start a self-service return. Email ${SUPPORT_EMAIL} if you need help.`,
       "RETURN_WINDOW_EXPIRED",
     );
-  }
-
-  if (order.status !== "delivered" && order.status !== "delivered_damaged") {
-    throw new ToolError("Returns can only be started after an order has been delivered.", "NOT_DELIVERED");
   }
 
   return {
     type: "return",
-    orderNumber: order.orderNumber,
+    orderId: order.order_id,
     item,
     reason,
-    labelUrl: `https://labels.northwind.example/${order.orderNumber}-${item.sku}.pdf`,
-    refundEstimate: "Refund posts 5-7 business days after the carrier scans your package.",
-    message: `Your return for ${item.name} is started. Use the fake label below and drop it off within 7 days.`,
+    refundAmount: findProduct(item.product).price * item.qty,
+    labelUrl: `https://returns.shein-training.example/${order.order_id}-${slugify(item.product)}.pdf`,
+    refundEstimate: `${policies.return_policy.refund_method}; processing takes about ${policies.return_policy.processing_time_days} days after the package is scanned.`,
+    message: `Your return for ${item.product} is started. Items must be ${policies.return_policy.conditions.toLowerCase()}`,
   };
 }
 
-export function startExchange(orderNumber: string, sku: string, newSize: string): ToolResult {
-  const order = findOrder(orderNumber);
-  const item = findItem(order, sku);
+export function startExchange(orderId: string, productName: string, newSize?: string, newColor?: string): ToolResult {
+  const order = findOrder(orderId);
+  const item = findItem(order, productName);
+  const product = findProduct(item.product);
+  const normalizedSize = newSize?.trim().toUpperCase() || item.size;
+  const normalizedColor = newColor?.trim();
 
-  if (item.finalSale || order.status === "final_sale") {
-    throw new ToolError(
-      `${item.name} is final sale, so it is not eligible for size exchange. Email ${SUPPORT_EMAIL} if you need help.`,
-      "FINAL_SALE",
-    );
+  if (!newSize?.trim() && !normalizedColor) {
+    throw new ToolError("Tell me the new size or color you want before I start the exchange.", "EXCHANGE_TARGET_REQUIRED");
   }
 
-  if (order.status === "outside_return_window") {
+  if (order.shipping_status !== "Delivered") {
+    throw new ToolError("Exchanges can only be started after an order has been delivered.", "NOT_DELIVERED");
+  }
+
+  if (isOutsideReturnWindow(order.order_date)) {
     throw new ToolError(
-      `This order is outside the exchange window, so we cannot start a self-service size swap.`,
+      `This order is outside SHEIN's ${policies.return_policy.window_days}-day exchange window, so we cannot start a self-service size swap.`,
       "RETURN_WINDOW_EXPIRED",
     );
   }
 
-  if (order.status !== "delivered" && order.status !== "delivered_damaged") {
-    throw new ToolError("Exchanges can only be started after an order has been delivered.", "NOT_DELIVERED");
+  if (!product.sizes.map((size) => size.toUpperCase()).includes(normalizedSize)) {
+    throw new ToolError(
+      `${item.product} is not available in size ${normalizedSize}. Available sizes: ${product.sizes.join(", ")}.`,
+      "SIZE_UNAVAILABLE",
+    );
   }
 
   return {
     type: "exchange",
-    orderNumber: order.orderNumber,
+    orderId: order.order_id,
     item,
+    product,
     oldSize: item.size,
-    newSize: newSize.trim().toUpperCase(),
-    message: `We reserved ${item.name} in size ${newSize.trim().toUpperCase()}. Ship back the original item within 7 days.`,
+    newSize: normalizedSize,
+    oldColor: item.color,
+    newColor: normalizedColor,
+    message: `We reserved ${item.product} in ${normalizedColor ? `${normalizedColor}, ` : ""}size ${normalizedSize}. Ship back the original ${item.size} item with the return label instructions.`,
   };
 }
 
-export function approveReplacement(orderNumber: string, sku: string, reason: string): ToolResult {
-  const order = findOrder(orderNumber);
-  const item = findItem(order, sku);
+export function approveReplacement(orderId: string, productName: string, reason: string): ToolResult {
+  const order = findOrder(orderId);
+  const item = findItem(order, productName);
 
-  if (item.finalSale || order.status === "final_sale") {
+  if (order.shipping_status !== "Delivered") {
     throw new ToolError(
-      `This item is final sale, so automatic replacement is not available. Please email ${SUPPORT_EMAIL} with your photo.`,
-      "FINAL_SALE",
-    );
-  }
-
-  if (order.status !== "delivered_damaged" && order.status !== "delivered") {
-    throw new ToolError(
-      "Replacement approvals are only available after delivery. If the package is still in transit, wait for delivery or email support.",
+      "Replacement approvals are only available after delivery. If the package is still in transit or pending, email support.",
       "REPLACEMENT_NOT_ALLOWED",
     );
   }
 
   return {
     type: "replacement",
-    orderNumber: order.orderNumber,
+    orderId: order.order_id,
     item,
     reason,
-    confirmationNumber: `RPL-${order.orderNumber.replace("NW-", "")}-${item.sku.split("-").at(-1)}`,
-    message: `Replacement approved for ${item.name}. A new item will ship in 1-2 business days.`,
+    confirmationNumber: `SHEIN-RPL-${order.order_id.replace("ORD-", "")}-${slugify(item.product).slice(0, 8).toUpperCase()}`,
+    message: `Replacement approved for ${item.product}. A new item will ship after the claim is reviewed in this training flow.`,
   };
 }
 
-function findOrder(orderNumber: string): Order {
-  const normalizedOrder = orderNumber.trim().toUpperCase();
-  const order = orders.find((candidate) => candidate.orderNumber.toUpperCase() === normalizedOrder);
+function findOrder(orderId: string): Order {
+  const normalizedOrder = orderId.trim().toUpperCase();
+  const order = orders.find((candidate) => candidate.order_id.toUpperCase() === normalizedOrder);
 
   if (!order) {
-    throw new ToolError(`Order ${orderNumber} was not found.`, "ORDER_NOT_FOUND");
+    throw new ToolError(`Order ${orderId} was not found.`, "ORDER_NOT_FOUND");
   }
 
   return order;
 }
 
-function findItem(order: Order, sku: string): OrderItem {
-  const normalizedSku = sku.trim().toUpperCase();
-  const item = order.items.find((candidate) => candidate.sku.toUpperCase() === normalizedSku);
+function findItem(order: Order, productName: string): OrderItem {
+  const normalizedProduct = productName.trim().toLowerCase();
+  const item = order.items.find(
+    (candidate) =>
+      candidate.product.toLowerCase() === normalizedProduct ||
+      candidate.product.toLowerCase().includes(normalizedProduct) ||
+      normalizedProduct.includes(candidate.product.toLowerCase()),
+  );
 
   if (!item) {
-    throw new ToolError(`We could not find SKU ${sku} on order ${order.orderNumber}.`, "ITEM_NOT_FOUND");
+    throw new ToolError(`We could not find ${productName} on order ${order.order_id}.`, "ITEM_NOT_FOUND");
   }
 
   return item;
+}
+
+function findProduct(productName: string): Product {
+  const product = products.find((candidate) => candidate.name.toLowerCase() === productName.toLowerCase());
+
+  if (!product) {
+    throw new ToolError(`We could not find product information for ${productName}.`, "ITEM_NOT_FOUND");
+  }
+
+  return product;
+}
+
+function isOutsideReturnWindow(orderDate: string) {
+  const placedAt = new Date(`${orderDate}T00:00:00Z`);
+  const returnBy = new Date(placedAt);
+  returnBy.setUTCDate(returnBy.getUTCDate() + policies.return_policy.window_days);
+  return new Date() > returnBy;
+}
+
+function slugify(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 }

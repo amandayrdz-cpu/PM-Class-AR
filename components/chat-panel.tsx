@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useRef, useState } from "react";
-import { AlertCircle, Loader2, Send, Sparkles } from "lucide-react";
+import { AlertCircle, Loader2, MessageCircle, Send } from "lucide-react";
 import { ToolCard } from "@/components/tool-cards";
 import type { ToolResult } from "@/lib/tools";
 import { cn } from "@/lib/utils";
@@ -25,14 +25,14 @@ type StreamEvent =
   | { event: "error"; data: { message: string } }
   | { event: "done"; data: Record<string, never> };
 
-const starterPrompts = ["Track my order", "Start a return", "Report a problem"];
+const starterPrompts = ["Where is my order ORD-1001?", "I want to return my jeans", "My hoodie arrived damaged"];
 
 const initialMessages: ChatMessage[] = [
   {
     id: "welcome",
     role: "assistant",
     content:
-      "Hi, I'm Northwind's support assistant. I can help with tracking, returns, exchanges, and damaged items. What's your order number and email?",
+      "Hi, I'm SHEIN's support assistant. I can help with tracking, returns, exchanges, and damaged or wrong items. What's your order ID and email?",
   },
 ];
 
@@ -81,7 +81,7 @@ export function ChatPanel() {
       });
 
       if (!response.ok) {
-        throw new Error("The assistant could not respond. Check the server logs and API key.");
+        throw new Error("The assistant could not respond. Check the server logs and OpenAI API key.");
       }
 
       await readEventStream(response, (streamEvent) => {
@@ -110,7 +110,7 @@ export function ChatPanel() {
         {
           id: crypto.randomUUID(),
           role: "assistant",
-          content: "I hit a setup issue. For the class, confirm ANTHROPIC_API_KEY is configured and try again.",
+          content: "I hit a setup issue. For the class, confirm OPENAI_API_KEY is configured and try again.",
           error: message,
         },
       ]);
@@ -174,15 +174,15 @@ export function ChatPanel() {
   }
 
   return (
-    <section className="flex h-[760px] max-h-[calc(100vh-3rem)] min-h-[620px] w-full max-w-[500px] flex-col overflow-hidden rounded-[2rem] border border-white/70 bg-white/90 shadow-2xl shadow-slate-900/10 backdrop-blur">
-      <header className="border-b border-slate-200/80 bg-white/80 p-5">
+    <section className="flex h-[760px] max-h-[calc(100vh-3rem)] min-h-[620px] w-full max-w-[500px] flex-col overflow-hidden rounded-[1.5rem] border border-zinc-200 bg-white shadow-2xl shadow-black/15">
+      <header className="border-b border-zinc-200 bg-white p-5">
         <div className="flex items-center gap-3">
-          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-slate-950 text-white">
-            <Sparkles className="h-5 w-5" />
+          <div className="grid h-11 w-11 place-items-center rounded-full bg-black text-white">
+            <MessageCircle className="h-5 w-5" />
           </div>
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-blue-700">Northwind Apparel</p>
-            <h1 className="text-xl font-semibold text-slate-950">Post-purchase support</h1>
+            <p className="text-sm font-semibold uppercase tracking-[0.28em] text-zinc-500">SHEIN</p>
+            <h1 className="text-xl font-semibold text-black">Order support</h1>
           </div>
         </div>
       </header>
@@ -193,21 +193,21 @@ export function ChatPanel() {
         ))}
 
         {isLoading ? (
-          <div className="flex items-center gap-2 rounded-2xl bg-slate-100 px-4 py-3 text-sm text-slate-600">
+          <div className="flex items-center gap-2 rounded-2xl bg-zinc-100 px-4 py-3 text-sm text-zinc-600">
             <Loader2 className="h-4 w-4 animate-spin" />
-            Northwind is checking the tools...
+            SHEIN support is checking your order...
           </div>
         ) : null}
       </div>
 
-      <div className="border-t border-slate-200 bg-white p-4">
+      <div className="border-t border-zinc-200 bg-white p-4">
         <div className="mb-3 flex flex-wrap gap-2">
           {starterPrompts.map((prompt) => (
             <button
               key={prompt}
               type="button"
               onClick={() => void sendMessage(prompt)}
-              className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-sm font-medium text-blue-700 transition hover:bg-blue-100"
+              className="rounded-full border border-zinc-300 bg-white px-3 py-1.5 text-sm font-medium text-zinc-900 transition hover:border-black hover:bg-zinc-100"
               disabled={isLoading}
             >
               {prompt}
@@ -228,12 +228,12 @@ export function ChatPanel() {
             }}
             placeholder="Type your message..."
             rows={2}
-            className="min-h-12 flex-1 resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none ring-blue-200 transition placeholder:text-slate-400 focus:bg-white focus:ring-4"
+            className="min-h-12 flex-1 resize-none rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm outline-none ring-zinc-200 transition placeholder:text-zinc-400 focus:bg-white focus:ring-4"
           />
           <button
             type="submit"
             disabled={isLoading || !input.trim()}
-            className="grid h-12 w-12 place-items-center rounded-2xl bg-slate-950 text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+            className="grid h-12 w-12 place-items-center rounded-2xl bg-black text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-300"
             aria-label="Send message"
           >
             <Send className="h-4 w-4" />
@@ -300,8 +300,8 @@ function MessageBubble({ message }: { message: ChatMessage }) {
         className={cn(
           "max-w-[86%] rounded-3xl px-4 py-3 text-sm leading-6",
           message.role === "user"
-            ? "rounded-br-lg bg-slate-950 text-white"
-            : "rounded-bl-lg bg-slate-100 text-slate-800",
+            ? "rounded-br-lg bg-black text-white"
+            : "rounded-bl-lg bg-zinc-100 text-zinc-800",
         )}
       >
         <p className="whitespace-pre-wrap">{message.content}</p>
